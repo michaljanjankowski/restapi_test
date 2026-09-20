@@ -1,9 +1,15 @@
-import json
-
 import requests
 
-from resources.cat_facts_data import Fact
 from resources.cat_facts_validators import validate_all_facts_have_non_empty_text
+from resources.mcp_data import (
+    CallToolParams,
+    CallToolResult,
+    ListToolsParams,
+    ListToolsResult,
+    McpRequest,
+    McpResponse,
+    RandomFactArguments,
+)
 
 
 MCP_ENDPOINT = "https://catfact.ninja/mcp"
@@ -11,38 +17,42 @@ HEADERS = {"Accept": "application/json, text/event-stream"}
 TIMEOUT = 10
 
 
-def call_mcp(request_id, method, params):
+def call_mcp(request: McpRequest) -> McpResponse:
     response = requests.post(
         MCP_ENDPOINT,
         headers=HEADERS,
-        json={"jsonrpc": "2.0", "id": request_id, "method": method, "params": params},
+        json=request.to_dict(),
         timeout=TIMEOUT,
     )
     assert response.status_code == 200
-    payload = response.json()
-    assert payload["jsonrpc"] == "2.0"
-    assert payload["id"] == request_id
-    assert "error" not in payload
-    return payload["result"]
+    result = McpResponse.from_dict(response.json(), request.method)
+    assert result.id == request.id
+    return result
 
 
 def test_mcp_lists_cat_fact_tools():
-    result = call_mcp(1, "tools/list", {})
+    response = call_mcp(McpRequest(id=1, method="tools/list", params=ListToolsParams()))
 
-    names = {tool["name"] for tool in result["tools"]}
+    assert isinstance(response.result, ListToolsResult)
+    names = {tool.name for tool in response.result.tools}
     assert {"random-cat-fact", "list-cat-facts", "list-breeds"} <= names
 
 
 def test_mcp_calls_random_cat_fact():
-    result = call_mcp(
-        2,
-        "tools/call",
-        {"name": "random-cat-fact", "arguments": {"max_length": 100}},
+    response = call_mcp(
+        McpRequest(
+            id=2,
+            method="tools/call",
+            params=CallToolParams(
+                name="random-cat-fact", arguments=RandomFactArguments(max_length=100)
+            ),
+        )
     )
 
-    assert result["isError"] is False
-    text_items = [item["text"] for item in result["content"] if item["type"] == "text"]
+    assert isinstance(response.result, CallToolResult)
+    assert response.result.is_error is False
+    text_items = [item for item in response.result.content if item.type == "text"]
     assert len(text_items) == 1
-    fact = Fact.from_dict(json.loads(text_items[0]))
+    fact = text_items[0].as_fact()
     validate_all_facts_have_non_empty_text([fact])
     assert fact.length <= 100
