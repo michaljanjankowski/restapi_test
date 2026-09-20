@@ -22,3 +22,7 @@ The tests send live requests to `https://catfact.ninja` and require internet acc
 - `GET /facts?limit=3&max_length=100`: the list respects both filters.
 - `GET /facts?page=2&limit=3`: pagination returns the requested page.
 - `GET /breeds?limit=3`: breed records include their documented fields.
+- `POST /mcp` with `tools/list`: the MCP server advertises its cat fact tools.
+- `POST /mcp` with `tools/call`: `random-cat-fact` returns a valid fact no longer than 100 characters.
+
+Run only the MCP tests with `uv run pytest test_mcp.py -q`.
