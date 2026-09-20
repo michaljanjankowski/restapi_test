@@ -1,37 +1,24 @@
-# RestAPI tests for cat-fact.herokuapp.com
+# Cat Facts API tests
 
-## Tests descriptions
+Integration tests for the public [Cat Facts API](https://catfact.ninja/).
 
-- [Test_GET_facts](#get-facts)
-- [Test_POST_facts](#post-facts-negativ)
-- [Test_GAT_facts_random](#get-facts-random)
+## Run
 
-## Get Facts
-| Steps | Action                   | Expected result       |
-|-------|--------------------------|-----------------------|
-| 1     | Send GET /facts          | GET send succesfully  |
-| 2     | Validate response status | Response status shall be 200|
-|3 | Validate response content stucture| Response strocture shall be like in API specification
-|4| Validate facts feature | Each fact shall contain not empty text, feature verification|
+Install [uv](https://docs.astral.sh/uv/getting-started/installation/) and use Python 3.10:
 
-## Post Facts Negativ
-| Steps | Action                         | Expected result                                                                                           |
-|-------|--------------------------------|-----------------------------------------------------------------------------------------------------------|
-| 1     | Send POST /facts               | POST send succesfully                                                                                     |
-| 2     | Validate response status       | Response status shall be 401, beacuase I am not autheticatied user. Authetication is possible only via UI |
-|3 | Validate error message content | Error message shall contain "Sign in first"                                                                |
+```sh
+uv sync --python 3.10
+uv run pytest
+```
 
-## Get Facts Random
-| Steps | Action                             | Expected result       |
-|-------|------------------------------------|-----------------------|
-| 1     | Send GET /facts/random             | GET send succesfully  |
-| 2     | Validate response status           | Response status shall be 200|
-|3 | Validate response content stucture | Response strocture shall be like in API specification
-|4| Validate facts feature             | Each fact shall contain not empty text, feature verification|
+Dependencies are declared in `pyproject.toml` and pinned in `uv.lock`.
+The tests send live requests to `https://catfact.ninja` and require internet access.
 
+## Coverage
 
-**Test designs comments:**
-- Test basis are taken from cat-facts API specification,
-- Firts and third tests are positive tests, that verifies endpoints functions and the content of delivered responses to GET calls,
-- Second test is negative security test, that verifies if not autheticated user can not add a fact. 
-  - It bases on current cat-facts implemtation, that user authetication can be done only via UI.
+- `GET /facts`: the response contains a non-empty list of cat facts with valid text and length.
+- `GET /fact`: the response contains one random cat fact with valid text and length.
+- `POST /facts`: the API returns `404 Not Found` because this endpoint does not support creating facts.
+- `GET /facts?limit=3&max_length=100`: the list respects both filters.
+- `GET /facts?page=2&limit=3`: pagination returns the requested page.
+- `GET /breeds?limit=3`: breed records include their documented fields.

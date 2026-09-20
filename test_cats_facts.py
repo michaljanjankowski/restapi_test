@@ -1,47 +1,72 @@
 import requests
-import json
-from resources.cat_facts_helpers import api_reponse_to_fact_data
-from resources.cat_facts_validators import validate_all_facts_has_not_empty_text
 
-CAT_FACTS_ENDPOINT = "cat-fact.herokuapp.com"
+from resources.cat_facts_helpers import api_response_to_fact_data
+from resources.cat_facts_validators import validate_all_facts_have_non_empty_text
 
 
-def test_positice_get_facts():
-    # Step 1: Send GET request to `/facts`
-    response = requests.get(f"https://{CAT_FACTS_ENDPOINT}/facts")
-
-    # Step 2: Validate response status code
-    assert response.status_code == 200, f"Expected status code 200, got {response.status_code}"
-
-    # Step 3: Convert response to Fact dataclass and validate fields types
-    fact_datas = api_reponse_to_fact_data(api_response=response)
-
-    # Step 4: Validate the `text` field
-    if fact_datas:
-        validate_all_facts_has_not_empty_text(cat_facts_data_lst=fact_datas)
+CAT_FACTS_API = "https://catfact.ninja"
+TIMEOUT = 10
 
 
+def test_get_facts():
+    response = requests.get(f"{CAT_FACTS_API}/facts", timeout=TIMEOUT)
 
-def test_negative_try_post_fact():
-    # Step 1: Send POST request to `/facts`
-    response = requests.post(f"https://{CAT_FACTS_ENDPOINT}/facts")
-    # Step 2: Verify status code is 401
-    assert response.status_code == 401
-    text_json = json.loads(response.text)
-    # Step 3: Verify error message content
-    assert text_json['message'] == "Sign in first"
+    assert response.status_code == 200
+    facts = api_response_to_fact_data(response)
+    assert facts, "Expected at least one cat fact"
+    validate_all_facts_have_non_empty_text(facts)
 
 
-def test_positice_get_facts_random():
-    # Step 1: Send GET request to `/facts`
-    response = requests.get(f"https://{CAT_FACTS_ENDPOINT}/facts/random")
+def test_post_facts_is_not_available():
+    response = requests.post(f"{CAT_FACTS_API}/facts", timeout=TIMEOUT)
 
-    # Step 2: Validate response status code
-    assert response.status_code == 200, f"Expected status code 200, got {response.status_code}"
+    assert response.status_code == 404
+    assert response.json()["message"] == "Not Found"
 
-    # Step 3: Convert response to Fact dataclass and validate fields types
-    fact_datas = api_reponse_to_fact_data(api_response=response)
 
-    # Step 4: Validate the `text` field
-    if fact_datas:
-        validate_all_facts_has_not_empty_text(cat_facts_data_lst=fact_datas)
+def test_get_random_fact():
+    response = requests.get(f"{CAT_FACTS_API}/fact", timeout=TIMEOUT)
+
+    assert response.status_code == 200
+    facts = api_response_to_fact_data(response)
+    assert len(facts) == 1
+    validate_all_facts_have_non_empty_text(facts)
+
+
+def test_get_facts_respects_limit_and_max_length():
+    response = requests.get(
+        f"{CAT_FACTS_API}/facts",
+        params={"limit": 3, "max_length": 100},
+        timeout=TIMEOUT,
+    )
+
+    assert response.status_code == 200
+    facts = api_response_to_fact_data(response)
+    assert len(facts) == 3
+    validate_all_facts_have_non_empty_text(facts)
+    assert all(fact.length <= 100 for fact in facts)
+
+
+def test_get_facts_second_page():
+    response = requests.get(
+        f"{CAT_FACTS_API}/facts", params={"page": 2, "limit": 3}, timeout=TIMEOUT
+    )
+
+    assert response.status_code == 200
+    assert response.json()["current_page"] == 2
+    facts = api_response_to_fact_data(response)
+    assert len(facts) == 3
+    validate_all_facts_have_non_empty_text(facts)
+
+
+def test_get_breeds_with_limit():
+    response = requests.get(
+        f"{CAT_FACTS_API}/breeds", params={"limit": 3}, timeout=TIMEOUT
+    )
+
+    assert response.status_code == 200
+    breeds = response.json()["data"]
+    assert len(breeds) == 3
+    for breed in breeds:
+        for field in ("breed", "country", "origin", "coat", "pattern"):
+            assert isinstance(breed[field], str) and breed[field].strip()
